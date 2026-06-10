@@ -20,15 +20,12 @@
  *
  * Same SPI NOR partition layout as AP-365 (confirmed by /proc/mtd dump).
  *
- * LED / GPIO map corrected from the ArubaOS Glenmorangie device tree
- * (kernel-extracted-aos-full-31M.itb -> aruba_pin_mux/led = 37,42,51,52,61,68)
- * and verified live on an IAP-305 by toggling GPIOs (2026-06-09):
- *   - gpio42 = system LED amber   (active high)   [confirmed]
- *   - gpio68 = wifi   LED red     (active high)   [confirmed: off switches
- *                                  the wifi LED from red to dark]
- *   - gpio51 = wifi   LED green   (active high)   [confirmed; 68+51 = yellow]
- *   - gpio61 = wifi   LED amber   (active high)   [confirmed]
- *   - gpio37, gpio52 = remaining candidates for system green [untested]
+ * LED / GPIO map from the ArubaOS Glenmorangie device tree
+ * (kernel-extracted-aos-full-31M.itb -> aruba_pin_mux/led = 37,42,51,52,61,68),
+ * fully verified live on an IAP-305 by toggling GPIOs (2026-06-09/10).
+ * Two tricolor LEDs, all elements active high:
+ *   system: green=37  red=52  amber=42
+ *   wlan:   green=51  red=68  amber=61
  * The previous 46/49/61 LEDs were inherited from the AP-365 DTS and are WRONG
  * for the AP-305. gpio42 is NOT a PHY reset (the old hog forced the amber on);
  * the real PHY reset/enable is gpio47 (held high), hogged below.
@@ -36,45 +33,56 @@
 
 #include "qcom-ipq4029-aruba-glenmorangie.dtsi"
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
 
 / {
 	model = "Aruba AP-305";
 	compatible = "aruba,ap-305";
 
 	aliases {
-		led-boot = &led_system_amber;
-		led-failsafe = &led_system_amber;
-		/* No system-green found yet (candidates: gpio37, gpio52 from
-		 * the ArubaOS pin list). Solid amber = running, for now. */
-		led-running = &led_system_amber;
-		led-upgrade = &led_system_amber;
+		led-boot = &led_status_green;
+		led-failsafe = &led_status_red;
+		led-running = &led_status_green;
+		led-upgrade = &led_status_amber;
 	};
 
 	leds {
 		compatible = "gpio-leds";
 
-		led_system_amber: system-amber {
-			label = "amber:system";
+		led_status_green: led-0 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_GREEN>;
+			gpios = <&tlmm 37 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_status_red: led-1 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_RED>;
+			gpios = <&tlmm 52 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_status_amber: led-2 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_AMBER>;
 			gpios = <&tlmm 42 GPIO_ACTIVE_HIGH>;
 		};
 
-		wifi-red {
-			label = "red:wifi";
-			/* Live-tested 2026-06-09: gpio68 lights the RED element
-			 * of the wifi LED (was previously mislabeled green:system:
-			 * turning it off switched the wifi LED from red to off). */
-			gpios = <&tlmm 68 GPIO_ACTIVE_HIGH>;
-		};
-
-		wifi-green {
-			label = "green:wifi";
-			/* Live-tested: red(68)+green(51) = yellow/amber mix. */
+		led-3 {
+			function = LED_FUNCTION_WLAN;
+			color = <LED_COLOR_ID_GREEN>;
 			gpios = <&tlmm 51 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "phy1tpt";	/* 5 GHz activity */
 		};
 
-		wifi-amber {
-			label = "amber:wifi";
+		led-4 {
+			function = LED_FUNCTION_WLAN;
+			color = <LED_COLOR_ID_RED>;
+			gpios = <&tlmm 68 GPIO_ACTIVE_HIGH>;
+		};
+
+		led-5 {
+			function = LED_FUNCTION_WLAN;
+			color = <LED_COLOR_ID_AMBER>;
 			gpios = <&tlmm 61 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "phy0tpt";	/* 2.4 GHz activity */
 		};
@@ -93,15 +101,17 @@
 	/*
 	 * GPIO map (AP-305 / Glenmorangie), corrected:
 	 *   3  - out - watchdog poke (linked above)
+	 *   37 - out - status green LED
 	 *   38 - out - PCIe PERST# (declared on &pcie0 below)
 	 *   39 - out - "reset watchdog status flipflop" (Aruba) - leave alone
 	 *   40 - out - "enable watchdog" (Aruba) - leave alone
-	 *   42 - out - system amber LED (was wrongly hogged as phy-reset)
+	 *   42 - out - status amber LED (was wrongly hogged as phy-reset)
 	 *   47 - out - PHY reset/enable (active high, held high) - hogged below
 	 *   50 - in  - reset button (declared in glenmorangie.dtsi)
-	 *   51 - out - wifi green LED
-	 *   61 - out - wifi amber LED
-	 *   68 - out - wifi red LED
+	 *   51 - out - wlan green LED
+	 *   52 - out - status red LED
+	 *   61 - out - wlan amber LED
+	 *   68 - out - wlan red LED
 	 */
 	phy-reset {
 		line-name = "PHY-reset";
