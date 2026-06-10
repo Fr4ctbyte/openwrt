@@ -22,11 +22,13 @@
  *
  * LED / GPIO map corrected from the ArubaOS Glenmorangie device tree
  * (kernel-extracted-aos-full-31M.itb -> aruba_pin_mux/led = 37,42,51,52,61,68)
- * and verified live on an IAP-305 by toggling GPIOs:
+ * and verified live on an IAP-305 by toggling GPIOs (2026-06-09):
  *   - gpio42 = system LED amber   (active high)   [confirmed]
- *   - gpio68 = system LED green   (active high)   [inferred, verify on boot]
- *   - gpio51 = wifi   LED green   (active high)   [confirmed]
+ *   - gpio68 = wifi   LED red     (active high)   [confirmed: off switches
+ *                                  the wifi LED from red to dark]
+ *   - gpio51 = wifi   LED green   (active high)   [confirmed; 68+51 = yellow]
  *   - gpio61 = wifi   LED amber   (active high)   [confirmed]
+ *   - gpio37, gpio52 = remaining candidates for system green [untested]
  * The previous 46/49/61 LEDs were inherited from the AP-365 DTS and are WRONG
  * for the AP-305. gpio42 is NOT a PHY reset (the old hog forced the amber on);
  * the real PHY reset/enable is gpio47 (held high), hogged below.
@@ -42,7 +44,9 @@
 	aliases {
 		led-boot = &led_system_amber;
 		led-failsafe = &led_system_amber;
-		led-running = &led_system_green;
+		/* No system-green found yet (candidates: gpio37, gpio52 from
+		 * the ArubaOS pin list). Solid amber = running, for now. */
+		led-running = &led_system_amber;
 		led-upgrade = &led_system_amber;
 	};
 
@@ -54,17 +58,17 @@
 			gpios = <&tlmm 42 GPIO_ACTIVE_HIGH>;
 		};
 
-		led_system_green: system-green {
-			label = "green:system";
-			/* INFERRED by elimination from ArubaOS LED pin list;
-			 * confirm on first boot (system LED should be green).
-			 * gpio68 is in the inherited nand pin group but, like
-			 * gpio61, leds-gpio claims it as a plain GPIO. */
+		wifi-red {
+			label = "red:wifi";
+			/* Live-tested 2026-06-09: gpio68 lights the RED element
+			 * of the wifi LED (was previously mislabeled green:system:
+			 * turning it off switched the wifi LED from red to off). */
 			gpios = <&tlmm 68 GPIO_ACTIVE_HIGH>;
 		};
 
 		wifi-green {
 			label = "green:wifi";
+			/* Live-tested: red(68)+green(51) = yellow/amber mix. */
 			gpios = <&tlmm 51 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "phy1tpt";	/* 5 GHz activity */
 		};
@@ -97,7 +101,7 @@
 	 *   50 - in  - reset button (declared in glenmorangie.dtsi)
 	 *   51 - out - wifi green LED
 	 *   61 - out - wifi amber LED
-	 *   68 - out - system green LED (inferred)
+	 *   68 - out - wifi red LED
 	 */
 	phy-reset {
 		line-name = "PHY-reset";
